@@ -1,0 +1,9 @@
+.vscode
+.github
+
+.env
+.env.example
+venv
+
+__pycache__
+*.pyc
