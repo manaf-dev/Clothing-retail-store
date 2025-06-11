@@ -1,6 +1,6 @@
 <script setup>
     import { ref } from "vue";
-    import Formatters from "@/utils/formatters.js";
+    import {Formatters} from "@/utils/formatters.js";
 
     const props = defineProps({
         selectedSale: {

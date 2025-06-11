@@ -1,5 +1,5 @@
 
-class Formatters {
+export class Formatters {
     static formatNumber(value) {
         return parseFloat(value).toFixed(2);
     }
@@ -43,4 +43,3 @@ class Formatters {
     }
 };
 
-export default Formatters;

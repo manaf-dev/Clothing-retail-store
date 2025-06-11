@@ -2,7 +2,7 @@
     import { ref, computed } from "vue";
     import NewSaleModal from "./NewSaleModal.vue";
     import SaleDetailModal from "./SaleDetailModal.vue";
-    import Formatters from "@/utils/formatters.js";
+    import {Formatters} from "@/utils/formatters.js";
 
     const totalSales = ref(245);
     const selectedSale = ref(null);

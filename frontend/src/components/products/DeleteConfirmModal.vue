@@ -1,7 +1,32 @@
+<script setup>
+    defineProps({
+        isOpen: {
+            type: Boolean,
+            required: true,
+        },
+        product: {
+            type: Object,
+            required: true,
+        },
+    });
+
+    const emit = defineEmits(["close", "confirm"]);
+
+    const onConfirm = () => {
+        emit("confirm");
+    };
+
+    const onClose = () => {
+        emit("close");
+    };
+</script>
+
+
 <template>
     <div v-if="isOpen" class="fixed z-10 inset-0 overflow-y-auto">
+        <!-- Modal Content -->
         <div
-            class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0"
+            class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0 relative z-20"
         >
             <span
                 class="hidden sm:inline-block sm:align-middle sm:h-screen"
@@ -71,33 +96,10 @@
                     </button>
                 </div>
             </div>
-
-            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
+        </div>
+        <!-- Overlay (z-10 so it's below modal content) -->
+        <div class="fixed inset-0 transition-opacity z-10" aria-hidden="true">
+            <div class="absolute inset-0 bg-black/20"></div>
         </div>
     </div>
 </template>
-
-<script setup>
-    defineProps({
-        isOpen: {
-            type: Boolean,
-            required: true,
-        },
-        product: {
-            type: Object,
-            required: true,
-        },
-    });
-
-    const emit = defineEmits(["close", "confirm"]);
-
-    const onConfirm = () => {
-        emit("confirm");
-    };
-
-    const onClose = () => {
-        emit("close");
-    };
-</script>
