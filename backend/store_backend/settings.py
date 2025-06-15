@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.customers.apps.CustomersConfig",
     "apps.authentication.apps.AuthenticationConfig",
     "apps.staff.apps.StaffConfig",
+    "apps.dashboard.apps.DashboardConfig",
     "rest_framework",
     "django_filters",
     "corsheaders",

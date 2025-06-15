@@ -1,6 +1,12 @@
 <script setup>
-    import { ref, computed } from "vue";
+    import { ref, computed, onMounted, watch } from "vue";
     import { Formatters } from "@/utils/formatters.js";
+    import { SalesService } from "@/services/salesService.js";
+    import { CustomerService } from "@/services/customerService.js";
+    import { ProductService } from "@/services/productService.js";
+    import { useToast } from "vue-toastification";
+
+    const toast = useToast();
 
     const props = defineProps({
         isNewSaleModalOpen: {
@@ -9,10 +15,13 @@
             default: false,
         },
     });
-    const emit = defineEmits(["closeNewSaleModal"]);
+    const emit = defineEmits(["closeNewSaleModal", "saleCreated"]);
 
     const showNewCustomerForm = ref(false);
-    const selectedSale = ref(null);
+    const loading = ref(false);
+    const customers = ref([]);
+    const availableProducts = ref([]);
+    
     const newCustomer = ref({
         name: "",
         email: "",
@@ -26,104 +35,99 @@
         taxRate: 8.5,
         paymentMethod: "cash",
         notes: "",
+        discountAmount: 0,
     });
 
-    const updateProductDetails = (index) => {
-        const item = newSale.value.items[index];
-        const product = availableProducts.value.find(
-            (p) => p.id === item.productId
-        );
-
-        if (product) {
-            item.price = product.price;
-            item.total = item.price * item.quantity;
-            calculateItemTotal(index);
+    // Load data from backend
+    const loadCustomers = async () => {
+        try {
+            const response = await CustomerService.getAllCustomers();
+            customers.value = response.results ? 
+                CustomerService.transformMultipleToFrontend(response.results) :
+                CustomerService.transformMultipleToFrontend(response);
+        } catch (error) {
+            console.error("Failed to load customers:", error);
+            toast.error("Failed to load customers.");
         }
     };
 
-    const customers = ref([
-        {
-            id: 1,
-            name: "John Doe",
-            email: "john.doe@example.com",
-            phone: "(555) 123-4567",
-            address: "123 Main St, Anytown, USA",
-        },
-        {
-            id: 2,
-            name: "Jane Smith",
-            email: "jane.smith@example.com",
-            phone: "(555) 987-6543",
-            address: "456 Oak Ave, Sometown, USA",
-        },
-        {
-            id: 3,
-            name: "Robert Johnson",
-            email: "robert.j@example.com",
-            phone: "(555) 765-4321",
-            address: "789 Pine St, Othertown, USA",
-        },
-    ]);
+    const loadProducts = async () => {
+        try {
+            const response = await ProductService.getAllProducts({ status: 'active' });
+            availableProducts.value = response.results ? 
+                ProductService.transformMultipleToFrontend(response.results) :
+                ProductService.transformMultipleToFrontend(response);
+        } catch (error) {
+            console.error("Failed to load products:", error);
+            toast.error("Failed to load products.");
+        }
+    };
 
-    const availableProducts = ref([
-        {
-            id: 1,
-            name: "T-Shirt Classic",
-            sku: "TS-CL-001",
-            price: 29.99,
-            stock: 45,
-        },
-        {
-            id: 2,
-            name: "Polo Shirt",
-            sku: "PS-ST-001",
-            price: 49.99,
-            stock: 32,
-        },
-        {
-            id: 3,
-            name: "Denim Jeans",
-            sku: "DJ-BL-002",
-            price: 79.99,
-            stock: 28,
-        },
-        {
-            id: 4,
-            name: "Casual Jacket",
-            sku: "CJ-BK-001",
-            price: 129.99,
-            stock: 15,
-        },
-        {
-            id: 5,
-            name: "Summer Dress",
-            sku: "SD-FL-003",
-            price: 89.99,
-            stock: 20,
-        },
-        {
-            id: 6,
-            name: "Athletic Socks (3 Pack)",
-            sku: "AS-WH-003",
-            price: 19.99,
-            stock: 50,
-        },
-        {
-            id: 7,
-            name: "Leather Belt",
-            sku: "LB-BR-001",
-            price: 34.99,
-            stock: 22,
-        },
-    ]);
+    // --- FIXES & IMPROVEMENTS START ---
+    // 1. Always update item.price and item.total when product or quantity changes
+    const updateProductDetails = (index) => {
+        const item = newSale.value.items[index];
+        const product = availableProducts.value.find((p) => p.id === item.productId);
+        if (product) {
+            item.price = product.effective_price || product.price;
+            item.availableStock = product.stock;
+            // If quantity is not set, default to 1
+            if (!item.quantity || item.quantity < 1) item.quantity = 1;
+            item.total = item.price * item.quantity;
+            item.stockWarning = item.quantity > product.stock;
+        } else {
+            item.price = 0;
+            item.total = 0;
+            item.availableStock = 0;
+            item.stockWarning = false;
+        }
+    };
 
+    const calculateItemTotal = (index) => {
+        const item = newSale.value.items[index];
+        const product = availableProducts.value.find((p) => p.id === item.productId);
+        if (product) {
+            item.stockWarning = item.quantity > product.stock;
+            item.availableStock = product.stock;
+            item.price = product.effective_price || product.price;
+        } else {
+            item.stockWarning = false;
+            item.availableStock = 0;
+            item.price = 0;
+        }
+        item.total = item.price * item.quantity;
+    };
+
+    // Define the missing handlers for template
+    const onProductChange = (index) => {
+        updateProductDetails(index);
+        calculateItemTotal(index);
+    };
+
+    const onQuantityChange = (index) => {
+        updateProductDetails(index);  
+        calculateItemTotal(index);
+    };
+
+    // 2. Watch for changes in productId and quantity to auto-update totals
+    watch(
+        () => newSale.value.items.map(item => [item.productId, item.quantity]),
+        (newVal, oldVal) => {
+            newSale.value.items.forEach((item, idx) => {
+                updateProductDetails(idx);
+            });
+        },
+        { deep: true }
+    );
+
+    // 3. Fix canSaveSale to require customer selection
     const canSaveSale = computed(() => {
         return (
-            newSale.value.customerId &&
             newSale.value.items.length > 0 &&
             newSale.value.paymentMethod &&
+            newSale.value.customerId && // Ensure customer is selected
             !newSale.value.items.some(
-                (item) => !item.productId || item.quantity <= 0
+                (item) => !item.productId || item.quantity <= 0 || item.stockWarning
             )
         );
     });
@@ -138,48 +142,123 @@
         };
     };
 
-    const calculateItemTotal = (index) => {
-        const item = newSale.value.items[index];
-        const product = availableProducts.value.find(
-            (p) => p.id === item.productId
-        );
+    // 4. Add loading state to Complete Sale button
+    // 5. Reset form and reload products after sale
+    const resetForm = async () => {
+        newSale.value = {
+            customerId: "",
+            items: [],
+            taxRate: 8.5,
+            paymentMethod: "cash",
+            notes: "",
+            discountAmount: 0,
+        };
+        showNewCustomerForm.value = false;
+        newCustomer.value = { name: "", email: "", phone: "", address: "" };
+        await loadProducts(); // reload stock
+    };
 
-        if (product) {
-            // Check if quantity exceeds available stock
-            item.stockWarning = item.quantity > product.stock;
-            item.availableStock = product.stock;
+    // 6. Fix modal close to reset form
+    const closeNewSaleModal = () => {
+        resetForm();
+        emit('closeNewSaleModal');
+    };
+
+    // 7. Add error handling for missing customer
+    const saveSale = async () => {
+        if (!canSaveSale.value) {
+            return;
         }
 
-        item.total = item.price * item.quantity;
-    };
+        try {
+            loading.value = true;
 
-    const calculateSubtotal = () => {
-        return newSale.value.items.reduce(
-            (sum, item) => sum + (item.total || 0),
-            0
-        );
-    };
+            // Check stock levels
+            for (const item of newSale.value.items) {
+                const product = availableProducts.value.find(
+                    (p) => p.id === item.productId
+                );
+                if (!product) {
+                    toast.error(`Product not found. Please refresh the page.`);
+                    return;
+                }
+                if (item.quantity > product.stock) {
+                    toast.error(
+                        `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`
+                    );
+                    return;
+                }
+            }
 
-    const calculateTax = () => {
-        const subtotal = calculateSubtotal();
-        return subtotal * (newSale.value.taxRate / 100);
-    };
+            // Prepare order data for backend
+            const subtotal = calculateSubtotal();
+            const tax = calculateTax();
+            
+            const orderData = {
+                customer_id: newSale.value.customerId || null,
+                items: newSale.value.items.map(item => ({
+                    product_id: item.productId,
+                    quantity: item.quantity,
+                    price: item.price
+                })),
+                payment_method: newSale.value.paymentMethod,
+                notes: newSale.value.notes,
+                discount_amount: newSale.value.discountAmount || 0,
+                tax_amount: tax
+            };
 
-    const calculateTotal = () => {
-        const subtotal = calculateSubtotal();
-        const tax = calculateTax();
-        return subtotal + tax;
+            // Create the order via API
+            const createdOrder = await SalesService.createOrder(orderData);
+            
+            toast.success(`Sale completed successfully. Order #${createdOrder.order_number}`);
+            
+            // Reset form
+            resetForm();
+            // Reload products to update stock
+            await loadProducts();
+            
+            // Emit event to refresh sales list
+            emit('saleCreated', createdOrder);
+            
+            // Close modal
+            closeNewSaleModal();
+            
+        } catch (error) {
+            console.error("Failed to create sale:", error);
+            toast.error("Failed to create sale. Please try again.");
+        } finally {
+            loading.value = false;
+        }
     };
 
     const cancelNewCustomer = () => {
         showNewCustomerForm.value = false;
     };
 
-    const saveNewCustomer = () => {
+    const saveNewCustomer = async () => {
         // Simple validation
         if (!newCustomer.value.name || !newCustomer.value.email) {
-            alert("Please provide at least a name and email for the customer.");
+            toast.error("Please provide at least a name and email for the customer.");
             return;
+        }
+
+        try {
+            const customerData = CustomerService.transformToBackend(newCustomer.value);
+            const createdCustomer = await CustomerService.createCustomer(customerData);
+            const transformedCustomer = CustomerService.transformToFrontend(createdCustomer);
+            
+            // Add to customers list and select it
+            customers.value.unshift(transformedCustomer);
+            newSale.value.customerId = transformedCustomer.id;
+            
+            // Reset form and hide it
+            newCustomer.value = { name: "", email: "", phone: "", address: "" };
+            showNewCustomerForm.value = false;
+            
+            toast.success("Customer created successfully!");
+        } catch (error) {
+            console.error("Failed to create customer:", error);
+            toast.error("Failed to create customer. Please try again.");
         }
     };
 
@@ -198,100 +277,31 @@
         newSale.value.items.splice(index, 1);
     };
 
-    const saveSale = () => {
-        if (!canSaveSale.value) {
-            return;
-        }
-
-        // Get customer details
-        const customer = customers.value.find(
-            (c) => c.id === newSale.value.customerId
+    const calculateSubtotal = () => {
+        return newSale.value.items.reduce(
+            (sum, item) => sum + (item.total || 0),
+            0
         );
+    };
 
-        if (!customer) {
-            alert("Please select a valid customer.");
-            return;
-        }
+    const calculateTax = () => {
+        const subtotal = calculateSubtotal();
+        return subtotal * (newSale.value.taxRate / 100);
+    };
 
-        // Check stock levels
-        for (const item of newSale.value.items) {
-            const product = availableProducts.value.find(
-                (p) => p.id === item.productId
-            );
-            if (item.quantity > product.stock) {
-                alert(
-                    `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`
-                );
-                return;
-            }
-        }
-
-        // Create sale object
+    const calculateTotal = () => {
         const subtotal = calculateSubtotal();
         const tax = calculateTax();
-        const total = calculateTotal();
-
-        const saleData = {
-            id: sales.value.length + 1,
-            invoiceNumber: `INV-2025-${String(sales.value.length + 1).padStart(
-                3,
-                "0"
-            )}`,
-            date: new Date(),
-            customer: customer,
-            items: newSale.value.items.map((item) => {
-                const product = availableProducts.value.find(
-                    (p) => p.id === item.productId
-                );
-                return {
-                    product: product,
-                    quantity: item.quantity,
-                    price: item.price,
-                    total: item.total,
-                };
-            }),
-            subtotal: subtotal,
-            taxRate: newSale.value.taxRate,
-            tax: tax,
-            total: total,
-            status: "Completed",
-            paymentMethod: newSale.value.paymentMethod,
-            notes: newSale.value.notes,
-        };
-
-        // Add to sales array
-        sales.value.unshift(saleData);
-        totalSales.value++;
-
-        // Update product stock (in a real app, this would be done on the server)
-        for (const item of newSale.value.items) {
-            const product = availableProducts.value.find(
-                (p) => p.id === item.productId
-            );
-            if (product) {
-                product.stock -= item.quantity;
-            }
-        }
-
-        // Update sales summary (in a real app, this would be calculated from actual data)
-        // salesSummary.value.daily += total;
-        // salesSummary.value.dailyPercentage = 15.8; // Example value
-        // salesSummary.value.weekly += total;
-        // salesSummary.value.weeklyPercentage = 10.2; // Example value
-
-        // Close the modal
-        closeNewSaleModal();
-
-        // Show success notification (in a real app)
-        alert(
-            `Sale completed successfully. Invoice #${saleData.invoiceNumber}`
-        );
+        return subtotal + tax - (newSale.value.discountAmount || 0);
     };
 
-    const closeNewSaleModal = () => {
-        isNewSaleModalOpen.value = false;
-        showNewCustomerForm.value = false;
-    };
+    // Initialize data when modal opens
+    onMounted(async () => {
+        await Promise.all([
+            loadCustomers(),
+            loadProducts()
+        ]);
+    });
 </script>
 
 <template>
@@ -464,9 +474,7 @@
                                     <div class="col-span-5">
                                         <select
                                             v-model="item.productId"
-                                            @change="
-                                                updateProductDetails(index)
-                                            "
+                                            @change="onProductChange(index)"
                                             class="border border-gray-300 rounded-md px-3 py-2 w-full"
                                         >
                                             <option value="" disabled>
@@ -491,7 +499,7 @@
                                             type="number"
                                             v-model="item.quantity"
                                             min="1"
-                                            @change="calculateItemTotal(index)"
+                                            @change="onQuantityChange(index)"
                                             class="border border-gray-300 rounded-md px-3 py-2 w-full"
                                         />
                                     </div>

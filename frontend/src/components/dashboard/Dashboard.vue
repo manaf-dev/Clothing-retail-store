@@ -1,447 +1,602 @@
 <script setup>
-    import { ref } from "vue";
+import { ref, onMounted, onUnmounted } from 'vue'
+import { dashboardService } from '@/services/dashboardService'
+import { orderService } from '@/services/orderService'
+import { inventoryService } from '@/services/inventoryService'
 
-    const recentSales = ref([
-        {
-            product: "Men's Casual T-Shirt",
-            customer: "John Doe",
-            date: "May 10, 2025",
-            amount: 29.99,
-        },
-        {
-            product: "Women's Summer Dress",
-            customer: "Jane Smith",
-            date: "May 10, 2025",
-            amount: 49.99,
-        },
-        {
-            product: "Kids Denim Jacket",
-            customer: "Mike Johnson",
-            date: "May 9, 2025",
-            amount: 34.99,
-        },
-        {
-            product: "Women's Handbag",
-            customer: "Sarah Williams",
-            date: "May 9, 2025",
-            amount: 89.99,
-        },
-        {
-            product: "Men's Formal Shirt",
-            customer: "Robert Brown",
-            date: "May 8, 2025",
-            amount: 59.99,
-        },
-    ]);
+const loading = ref(true)
+const metrics = ref({
+    month_metrics: {
+        total_revenue: 0,
+        orders_count: 0,
+        items_sold: 0,
+        avg_order_value: 0
+    },
+    today_metrics: {
+        total_revenue: 0,
+        orders_count: 0,
+        items_sold: 0,
+        avg_order_value: 0
+    },
+    recent_orders: [],
+    inventory_alerts: []
+})
 
-    const lowStockItems = ref([
-        {
-            product: "Men's Slim Fit Jeans",
-            category: "Men",
-            stock: 5,
-        },
-        {
-            product: "Women's Leather Jacket",
-            category: "Women",
-            stock: 3,
-        },
-        {
-            product: "Kids Winter Coat",
-            category: "Kids",
-            stock: 4,
-        },
-        {
-            product: "Silver Necklace",
-            category: "Accessories",
-            stock: 2,
-        },
-        {
-            product: "Men's Running Shoes",
-            category: "Men",
-            stock: 6,
-        },
-    ]);
+
+const loadDashboardData = async () => {
+    try {
+        loading.value = true
+
+        // Load main metrics
+        const overview = await dashboardService.getOverview()
+        metrics.value = overview.data
+        console.log('Dashboard metrics loaded:', metrics.value)
+        console.log('Today stats:', metrics.value.today_metrics)
+        console.log('Monthly metrics:', metrics.value.month_metrics)
+
+       
+
+    } catch (error) {
+        console.error('Error loading dashboard data:', error)
+
+    } finally {
+        loading.value = false
+    }
+}
+
+const refreshData = () => {
+    loadDashboardData()
+}
+
+const formatNumber = (num) => {
+    if (num === null || num === undefined) return '0'
+    return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+    }).format(num)
+}
+
+const formatTime = (dateString) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInMinutes = Math.floor((now - date) / (1000 * 60))
+
+    if (diffInMinutes < 1) return 'Just now'
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`
+    return date.toLocaleDateString()
+}
+
+let intervalId
+onMounted(() => {
+    loadDashboardData()
+    // Auto-refresh every 5 minutes
+    intervalId = setInterval(loadDashboardData, 5 * 60 * 1000)
+})
+onUnmounted(() => {
+    clearInterval(intervalId)
+})
 </script>
 
+
 <template>
-    <div>
-        <h1 class="text-2xl font-semibold text-gray-800 mb-6">Dashboard</h1>
-
-        <!-- Stats Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <!-- Total Sales -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-indigo-100 text-indigo-500">
-                        <svg
-                            class="h-8 w-8"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                        </svg>
-                    </div>
-                    <div class="ml-4">
-                        <h2 class="text-sm font-medium text-gray-600">
-                            Total Sales
-                        </h2>
-                        <div class="flex items-baseline">
-                            <p class="text-2xl font-semibold text-gray-800">
-                                $12,694
-                            </p>
-                            <p class="ml-2 text-sm text-green-600">+5.2%</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Total Products -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-blue-100 text-blue-500">
-                        <svg
-                            class="h-8 w-8"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                            />
-                        </svg>
-                    </div>
-                    <div class="ml-4">
-                        <h2 class="text-sm font-medium text-gray-600">
-                            Total Products
-                        </h2>
-                        <div class="flex items-baseline">
-                            <p class="text-2xl font-semibold text-gray-800">
-                                876
-                            </p>
-                            <p class="ml-2 text-sm text-gray-600">items</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Low Stock -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-yellow-100 text-yellow-500">
-                        <svg
-                            class="h-8 w-8"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                            />
-                        </svg>
-                    </div>
-                    <div class="ml-4">
-                        <h2 class="text-sm font-medium text-gray-600">
-                            Low Stock
-                        </h2>
-                        <div class="flex items-baseline">
-                            <p class="text-2xl font-semibold text-gray-800">
-                                12
-                            </p>
-                            <p class="ml-2 text-sm text-red-600">products</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Customers -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-green-100 text-green-500">
-                        <svg
-                            class="h-8 w-8"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                            />
-                        </svg>
-                    </div>
-                    <div class="ml-4">
-                        <h2 class="text-sm font-medium text-gray-600">
-                            Total Customers
-                        </h2>
-                        <div class="flex items-baseline">
-                            <p class="text-2xl font-semibold text-gray-800">
-                                258
-                            </p>
-                            <p class="ml-2 text-sm text-green-600">+18 new</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Recent Sales -->
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 class="text-lg font-medium text-gray-800">
-                        Recent Sales
-                    </h3>
-                </div>
-                <div class="p-4">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr class="bg-gray-50">
-                                    <th
-                                        class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                    >
-                                        Product
-                                    </th>
-                                    <th
-                                        class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                    >
-                                        Customer
-                                    </th>
-                                    <th
-                                        class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                    >
-                                        Date
-                                    </th>
-                                    <th
-                                        class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                    >
-                                        Amount
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                <tr
-                                    v-for="(sale, index) in recentSales"
-                                    :key="index"
-                                >
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        <div
-                                            class="text-sm font-medium text-gray-900"
-                                        >
-                                            {{ sale.product }}
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        <div class="text-sm text-gray-500">
-                                            {{ sale.customer }}
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        <div class="text-sm text-gray-500">
-                                            {{ sale.date }}
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">
-                                            ${{ sale.amount }}
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="mt-4 flex justify-center">
-                        <button
-                            class="text-sm text-indigo-600 hover:text-indigo-900"
-                        >
-                            View All Sales
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Low Stock Alert -->
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 class="text-lg font-medium text-gray-800">
-                        Low Stock Alert
-                    </h3>
-                </div>
-                <div class="p-4">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr class="bg-gray-50">
-                                    <th
-                                        class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                    >
-                                        Product
-                                    </th>
-                                    <th
-                                        class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                    >
-                                        Category
-                                    </th>
-                                    <th
-                                        class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                    >
-                                        Current Stock
-                                    </th>
-                                    <th
-                                        class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                    >
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                <tr
-                                    v-for="(item, index) in lowStockItems"
-                                    :key="index"
-                                >
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        <div
-                                            class="text-sm font-medium text-gray-900"
-                                        >
-                                            {{ item.product }}
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        <div class="text-sm text-gray-500">
-                                            {{ item.category }}
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        <div class="text-sm">
-                                            <span
-                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800"
-                                            >
-                                                {{ item.stock }}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="px-4 py-3 whitespace-nowrap text-sm text-gray-500"
-                                    >
-                                        <button
-                                            class="text-indigo-600 hover:text-indigo-900"
-                                        >
-                                            Restock
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="mt-4 flex justify-center">
-                        <button
-                            class="text-sm text-indigo-600 hover:text-indigo-900"
-                        >
-                            View All Low Stock
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Product Category Distribution -->
-        <div class="mt-8 bg-white rounded-lg shadow overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h3 class="text-lg font-medium text-gray-800">
-                    Product Category Distribution
-                </h3>
-            </div>
-            <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <!-- Men's Clothing -->
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <h4 class="font-medium text-gray-800">
-                            Men's Clothing
-                        </h4>
-                        <div class="mt-2 flex items-center justify-between">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                    class="bg-blue-600 h-2.5 rounded-full"
-                                    style="width: 40%"
-                                ></div>
-                            </div>
-                            <span class="ml-4 text-sm font-medium text-gray-700"
-                                >40%</span
-                            >
-                        </div>
-                        <p class="mt-2 text-sm text-gray-600">352 products</p>
-                    </div>
-
-                    <!-- Women's Clothing -->
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <h4 class="font-medium text-gray-800">
-                            Women's Clothing
-                        </h4>
-                        <div class="mt-2 flex items-center justify-between">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                    class="bg-pink-500 h-2.5 rounded-full"
-                                    style="width: 45%"
-                                ></div>
-                            </div>
-                            <span class="ml-4 text-sm font-medium text-gray-700"
-                                >45%</span
-                            >
-                        </div>
-                        <p class="mt-2 text-sm text-gray-600">390 products</p>
-                    </div>
-
-                    <!-- Kids' Clothing -->
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <h4 class="font-medium text-gray-800">
-                            Kids' Clothing
-                        </h4>
-                        <div class="mt-2 flex items-center justify-between">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                    class="bg-green-500 h-2.5 rounded-full"
-                                    style="width: 10%"
-                                ></div>
-                            </div>
-                            <span class="ml-4 text-sm font-medium text-gray-700"
-                                >10%</span
-                            >
-                        </div>
-                        <p class="mt-2 text-sm text-gray-600">89 products</p>
-                    </div>
-
-                    <!-- Accessories -->
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <h4 class="font-medium text-gray-800">Accessories</h4>
-                        <div class="mt-2 flex items-center justify-between">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                    class="bg-purple-500 h-2.5 rounded-full"
-                                    style="width: 5%"
-                                ></div>
-                            </div>
-                            <span class="ml-4 text-sm font-medium text-gray-700"
-                                >5%</span
-                            >
-                        </div>
-                        <p class="mt-2 text-sm text-gray-600">45 products</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="dashboard-container">
+    <div class="dashboard-header">
+      <h1>Store Dashboard</h1>
+      <div class="header-actions">
+        <button @click="refreshData" class="refresh-btn" :disabled="loading">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          Refresh
+        </button>
+      </div>
     </div>
+
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>Loading dashboard data...</p>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div v-else class="dashboard-content">
+      <!-- Key Metrics Cards -->
+      <div class="metrics-grid">
+        <div class="metric-card revenue">
+          <div class="metric-icon">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <h3>Total Revenue</h3>
+            <p class="metric-value">₵{{ formatNumber(metrics.month_metrics?.total_revenue) }}</p>
+            <span class="metric-label">This month sales</span>
+          </div>
+        </div>
+
+        <div class="metric-card orders">
+          <div class="metric-icon">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <h3>Total Orders</h3>
+            <p class="metric-value">{{ formatNumber(metrics.month_metrics?.orders_count) }}</p>
+            <span class="metric-label">This month orders</span>
+          </div>
+        </div>
+
+        <div class="metric-card products">
+          <div class="metric-icon">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <h3>Products Sold</h3>
+            <p class="metric-value">{{ formatNumber(metrics.month_metrics?.items_sold) }}</p>
+            <span class="metric-label">Total items sold</span>
+          </div>
+        </div>
+
+        <div class="metric-card average">
+          <div class="metric-icon">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <h3>Average Order Value</h3>
+            <p class="metric-value">₵{{ formatNumber(metrics.month_metrics?.avg_order_value) }}</p>
+            <span class="metric-label">Per order average</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Stats Section -->
+      <div class="quick-stats">
+        <div class="stats-card">
+          <h3>Today's Performance</h3>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">Today's Sales</span>
+              <span class="stat-value">₵{{ formatNumber(metrics.today_metrics?.total_revenue) }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Orders Today</span>
+              <span class="stat-value">{{ metrics.today_metrics?.orders_count }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Average Order value</span>
+              <span class="stat-value">{{ formatNumber(metrics.today_metrics?.avg_order_value) }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Items Sold</span>
+              <span class="stat-value">{{ metrics.today_metrics?.items_sold }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-card">
+          <h3>Inventory Alerts</h3>
+          <div v-if="metrics.inventory_alerts?.length > 0" class="alert-list">
+            <div v-for="item in metrics.inventory_alerts" :key="item.id" class="alert-item">
+              <div class="alert-icon">⚠️</div>
+              <div class="alert-content">
+                <span class="alert-product">{{ item.name }}</span>
+                <span class="alert-stock">{{ item.stock }} left</span>
+              </div>
+            </div>
+            <router-link to="/inventory" class="view-all-link">
+              View all alerts
+            </router-link>
+          </div>
+          <div v-else class="no-alerts">
+            <div class="no-alerts-icon">✅</div>
+            <p>All products are well stocked!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="recent-activity">
+        <div class="activity-header">
+          <h3>Recent Orders</h3>
+          <router-link to="/sales" class="view-all-link">View All</router-link>
+        </div>
+        
+        <div v-if="metrics.recent_orders?.length > 0" class="orders-list">
+          <div v-for="order in metrics.recent_orders" :key="order.id" class="order-item">
+            <div class="order-id">#{{ order.id }}</div>
+            <div class="order-details">
+              <span class="order-customer">{{ order.customer_name || 'Walk-in Customer' }}</span>
+              <span class="order-time">{{ formatTime(order.created_at) }}</span>
+            </div>
+            <div class="order-total">₵{{ formatNumber(order.total) }}</div>
+            <div class="order-status">
+              <span class="status-badge" :class="order.status.toLowerCase()">
+                {{ order.status }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="no-orders">
+          <p>No recent orders found.</p>
+          <router-link to="/pos" class="create-order-btn">Create First Order</router-link>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
+
+
+
+<style scoped>
+.dashboard-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.dashboard-header h1 {
+  color: #1f2937;
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #6b7280;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.metric-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.metric-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.metric-card.revenue .metric-icon { background: #10b981; }
+.metric-card.orders .metric-icon { background: #3b82f6; }
+.metric-card.products .metric-icon { background: #f59e0b; }
+.metric-card.average .metric-icon { background: #8b5cf6; }
+
+.metric-content h3 {
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+}
+
+.metric-value {
+  color: #1f2937;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.metric-label {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.quick-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stats-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.stats-card h3 {
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.stat-value {
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: #fef3c7;
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
+}
+
+.alert-icon {
+  font-size: 16px;
+}
+
+.alert-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.alert-product {
+  color: #1f2937;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.alert-stock {
+  color: #92400e;
+  font-size: 12px;
+}
+
+.no-alerts {
+  text-align: center;
+  padding: 20px;
+  color: #6b7280;
+}
+
+.no-alerts-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.recent-activity {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.activity-header h3 {
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.view-all-link {
+  color: #3b82f6;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.view-all-link:hover {
+  text-decoration: underline;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.order-item:hover {
+  background: #f3f4f6;
+}
+
+.order-id {
+  color: #1f2937;
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 60px;
+}
+
+.order-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.order-customer {
+  color: #1f2937;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.order-time {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.order-total {
+  color: #1f2937;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-badge.completed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.processing {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.no-orders {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.create-order-btn {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.create-order-btn:hover {
+  background: #2563eb;
+}
+
+@media (max-width: 768px) {
+  .quick-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .order-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+</style>

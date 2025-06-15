@@ -208,3 +208,6 @@ export class ProductService extends BaseRequests {
     return backendProducts.map(product => this.transformToFrontend(product));
   }
 }
+
+// Export both the class and an instance for different import styles
+export const productService = ProductService;

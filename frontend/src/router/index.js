@@ -10,9 +10,18 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/',
+      redirect: '/dashboard'
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: DashboardView,
+    },
+    {
+      path: '/pos',
+      name: 'pos',
+      component: () => import('@/views/POSView.vue'),
     },
     {
       path: '/products',
@@ -23,11 +32,6 @@ const router = createRouter({
       path: '/sales',
       name: 'sales',
       component: SalesView,
-    },
-    {
-      path: '/customers',
-      name: 'customers',
-      component: CustomersView,
     },
     {
       path: '/reports',
