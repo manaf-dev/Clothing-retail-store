@@ -73,7 +73,9 @@ class ProductViewSet(viewsets.ViewSet):
             products_page = paginator.page(paginator.num_pages)
 
         # Serialize data
-        serializer = ProductSerializer(products_page, many=True)
+        serializer = ProductSerializer(
+            products_page, many=True, context={"request": request}
+        )
 
         return Response(
             {
@@ -90,7 +92,7 @@ class ProductViewSet(viewsets.ViewSet):
     def create(self, request: Request) -> Response:
         """Create a new product."""
         data = request.data
-        product_data, error = create_product(data)
+        product_data, error = create_product(data, request=request)
 
         if error:
             return Response(error, status=status.HTTP_400_BAD_REQUEST)
@@ -109,7 +111,7 @@ class ProductViewSet(viewsets.ViewSet):
     def update(self, request: Request, pk=None) -> Response:
         """Update a specific product."""
         data = request.data
-        product_data, error = update_product(pk, data)
+        product_data, error = update_product(pk, data, request=request)
 
         if error:
             if error == "Product not found":
@@ -140,14 +142,18 @@ class ProductViewSet(viewsets.ViewSet):
         products = Product.objects.filter(stock__lte=10, stock__gt=0).select_related(
             "category"
         )
-        serializer = ProductSerializer(products, many=True)
+        serializer = ProductSerializer(
+            products, many=True, context={"request": request}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
     def out_of_stock(self, request: Request) -> Response:
         """Get products that are out of stock."""
         products = Product.objects.filter(stock=0).select_related("category")
-        serializer = ProductSerializer(products, many=True)
+        serializer = ProductSerializer(
+            products, many=True, context={"request": request}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["post"])
@@ -178,7 +184,9 @@ class ProductViewSet(viewsets.ViewSet):
             return Response({"results": []}, status=status.HTTP_200_OK)
 
         products = get_filtered_products(search=query)[:20]  # Limit to 20 results
-        serializer = ProductSerializer(products, many=True)
+        serializer = ProductSerializer(
+            products, many=True, context={"request": request}
+        )
 
         return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 
@@ -193,7 +201,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def list(self, request: Request) -> Response:
         """List all categories."""
         categories = Category.objects.all().order_by("name")
-        serializer = CategorySerializer(categories, many=True)
+        serializer = CategorySerializer(
+            categories, many=True, context={"request": request}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"])
@@ -202,7 +212,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
         try:
             category = Category.objects.get(pk=pk)
             products = category.products.all().order_by("name")
-            serializer = ProductSerializer(products, many=True)
+            serializer = ProductSerializer(
+                products, many=True, context={"request": request}
+            )
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Category.DoesNotExist:
             return Response(

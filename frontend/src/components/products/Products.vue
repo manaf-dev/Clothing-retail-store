@@ -24,6 +24,8 @@ const currentProduct = ref({
   stock: 0,
   min_stock: 0,
   description: "",
+  image: null,
+
 });
 const productToDelete = ref(null);
 
@@ -103,6 +105,7 @@ const openAddProduct = () => {
     stock: 0,
     min_stock: 0,
     description: "",
+    image: null,
   };
   editingProduct.value = false;
   showProductModal.value = true;
@@ -119,6 +122,7 @@ const closeProductModal = () => {
     stock: 0,
     min_stock: 0,
     description: "",
+    image: null,
   };
   editingProduct.value = false;
 };
@@ -472,6 +476,22 @@ onMounted(async () => {
               <tr v-for="product in displayedProducts" :key="product.id">
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
+                    <div class="flex-shrink-0 h-12 w-12 mr-4">
+                      <img 
+                        v-if="product.image"
+                        class="h-12 w-12 rounded-lg object-cover border border-gray-200" 
+                        :src="product.image" 
+                        :alt="product.name"
+                      />
+                      <div 
+                        v-else 
+                        class="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center border border-gray-200"
+                      >
+                        <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z" />
+                        </svg>
+                      </div>
+                    </div>
                     <div class="text-sm font-medium text-gray-900">
                       {{ product.name }}
                     </div>

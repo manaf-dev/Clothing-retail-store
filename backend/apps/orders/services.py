@@ -103,6 +103,23 @@ class OrderService:
             product.stock -= quantity
             product.save(update_fields=["stock"])
 
+            # Update inventory if it exists
+            try:
+                from apps.inventory.models import Inventory
+
+                inventory = Inventory.objects.get(product=product)
+                inventory.stock -= quantity
+                inventory.save(update_fields=["stock"])
+            except Inventory.DoesNotExist:
+                # Create inventory record if it doesn't exist
+                from apps.inventory.models import Inventory
+
+                Inventory.objects.create(
+                    product=product,
+                    stock=product.stock,
+                    min_stock=product.min_stock or 1,
+                )
+
             subtotal += order_item.line_total
 
         # Update order totals
@@ -164,6 +181,17 @@ class OrderService:
         for item in order.items.all():
             if item.product:
                 item.product.stock += item.quantity
+                item.product.save(update_fields=["stock"])
+
+                # Also restore inventory stock
+                try:
+                    from apps.inventory.models import Inventory
+
+                    inventory = Inventory.objects.get(product=item.product)
+                    inventory.stock += item.quantity
+                    inventory.save(update_fields=["stock"])
+                except Inventory.DoesNotExist:
+                    pass  # If no inventory record exists, skip
                 item.product.save(update_fields=["stock"])
 
         # Update order
@@ -245,19 +273,25 @@ class SalesAnalyticsService:
             )
 
             daily_stats = orders.aggregate(
-                total_sales=Sum("total") or Decimal("0"),
+                total_sales=Sum("total"),
                 total_orders=Count("id"),
-                total_items=Sum("items__quantity") or 0,
-                avg_order_value=Avg("total") or Decimal("0"),
+                total_items=Sum("items__quantity"),
+                avg_order_value=Avg("total"),
             )
+
+            # Handle None values from aggregation
+            total_sales = daily_stats["total_sales"] or Decimal("0")
+            total_orders = daily_stats["total_orders"] or 0
+            total_items = daily_stats["total_items"] or 0
+            avg_order_value = daily_stats["avg_order_value"] or Decimal("0")
 
             sales_data.append(
                 {
                     "date": current_date,
-                    "total_sales": daily_stats["total_sales"],
-                    "total_orders": daily_stats["total_orders"],
-                    "total_items_sold": daily_stats["total_items"],
-                    "average_order_value": daily_stats["avg_order_value"],
+                    "total_sales": total_sales,
+                    "total_orders": total_orders,
+                    "total_items_sold": total_items,
+                    "average_order_value": avg_order_value,
                 }
             )
 
@@ -328,21 +362,53 @@ class SalesAnalyticsService:
         }
 
     @staticmethod
-    def get_top_products(
-        start_date: date, end_date: date, limit: int = 10
-    ) -> List[Dict]:
+    def get_top_products(period: str = "month", limit: int = 10) -> List[Dict]:
         """
-        Get top-selling products for a date range
+        Get top-selling products for a period
 
         Args:
-            start_date: Start date
-            end_date: End date
+            period: Period type ('day', 'week', 'month', 'year')
             limit: Number of products to return
 
         Returns:
             List of top products data
         """
         from django.db.models import Sum, Count
+
+        # Calculate date range based on period
+        today = timezone.now().date()
+
+        if period == "day":
+            start_date = today
+            end_date = today
+        elif period == "week":
+            start_date = today - timedelta(days=today.weekday())
+            end_date = start_date + timedelta(days=6)
+        elif period == "month":
+            start_date = today.replace(day=1)
+            # Get last day of month
+            if start_date.month == 12:
+                end_date = start_date.replace(
+                    year=start_date.year + 1, month=1
+                ) - timedelta(days=1)
+            else:
+                end_date = start_date.replace(month=start_date.month + 1) - timedelta(
+                    days=1
+                )
+        elif period == "year":
+            start_date = today.replace(month=1, day=1)
+            end_date = today.replace(month=12, day=31)
+        else:
+            # Default to month
+            start_date = today.replace(day=1)
+            if start_date.month == 12:
+                end_date = start_date.replace(
+                    year=start_date.year + 1, month=1
+                ) - timedelta(days=1)
+            else:
+                end_date = start_date.replace(month=start_date.month + 1) - timedelta(
+                    days=1
+                )
 
         top_products = (
             OrderItem.objects.filter(
@@ -431,3 +497,396 @@ class SalesAnalyticsService:
             )
 
         return hourly_data
+
+    @staticmethod
+    def get_dashboard_stats(period: str) -> Dict:
+        """
+        Get dashboard statistics for a specific period
+
+        Args:
+            period: Period type ('today', 'week', 'month')
+
+        Returns:
+            Dictionary with dashboard statistics
+        """
+        today = timezone.now().date()
+
+        if period == "today":
+            start_date = today
+            end_date = today
+        elif period == "week":
+            start_date = today - timedelta(days=today.weekday())
+            end_date = start_date + timedelta(days=6)
+        elif period == "month":
+            start_date = today.replace(day=1)
+            # Get last day of month
+            if start_date.month == 12:
+                end_date = start_date.replace(
+                    year=start_date.year + 1, month=1
+                ) - timedelta(days=1)
+            else:
+                end_date = start_date.replace(month=start_date.month + 1) - timedelta(
+                    days=1
+                )
+        else:
+            # Default to month
+            start_date = today.replace(day=1)
+            if start_date.month == 12:
+                end_date = start_date.replace(
+                    year=start_date.year + 1, month=1
+                ) - timedelta(days=1)
+            else:
+                end_date = start_date.replace(month=start_date.month + 1) - timedelta(
+                    days=1
+                )
+
+        # Get orders for the period
+        orders = Order.objects.filter(
+            status="completed", created_at__date__range=[start_date, end_date]
+        )
+
+        # Calculate basic stats
+        stats = orders.aggregate(
+            total_revenue=Sum("total") or Decimal("0"),
+            total_orders=Count("id"),
+            average_order_value=Avg("total") or Decimal("0"),
+        )
+
+        # Calculate products sold
+        products_sold = (
+            OrderItem.objects.filter(order__in=orders).aggregate(
+                total_quantity=Sum("quantity")
+            )["total_quantity"]
+            or 0
+        )
+
+        # Calculate growth compared to previous period
+        period_days = (end_date - start_date).days + 1
+        prev_start = start_date - timedelta(days=period_days)
+        prev_end = start_date - timedelta(days=1)
+
+        prev_orders = Order.objects.filter(
+            status="completed", created_at__date__range=[prev_start, prev_end]
+        )
+
+        prev_stats = prev_orders.aggregate(
+            prev_revenue=Sum("total") or Decimal("0"),
+            prev_orders=Count("id"),
+            prev_aov=Avg("total") or Decimal("0"),
+        )
+
+        prev_products_sold = (
+            OrderItem.objects.filter(order__in=prev_orders).aggregate(
+                total_quantity=Sum("quantity")
+            )["total_quantity"]
+            or 0
+        )
+
+        # Calculate growth percentages (handle None values)
+        current_revenue = (
+            stats["total_revenue"]
+            if stats["total_revenue"] is not None
+            else Decimal("0")
+        )
+        current_total_orders = (
+            stats["total_orders"] if stats["total_orders"] is not None else 0
+        )
+        current_aov = (
+            stats["average_order_value"]
+            if stats["average_order_value"] is not None
+            else Decimal("0")
+        )
+
+        prev_revenue = (
+            prev_stats["prev_revenue"]
+            if prev_stats["prev_revenue"] is not None
+            else Decimal("0")
+        )
+        prev_orders = (
+            prev_stats["prev_orders"] if prev_stats["prev_orders"] is not None else 0
+        )
+        prev_aov = (
+            prev_stats["prev_aov"]
+            if prev_stats["prev_aov"] is not None
+            else Decimal("0")
+        )
+        prev_products = prev_products_sold if prev_products_sold is not None else 0
+
+        revenue_growth = 0
+        if prev_revenue > 0:
+            revenue_growth = float(
+                ((current_revenue - prev_revenue) / prev_revenue) * 100
+            )
+
+        order_growth = 0
+        if prev_orders > 0:
+            order_growth = float(
+                ((current_total_orders - prev_orders) / prev_orders) * 100
+            )
+
+        aov_growth = 0
+        if prev_aov > 0:
+            aov_growth = float(((current_aov - prev_aov) / prev_aov) * 100)
+
+        products_growth = 0
+        if prev_products > 0:
+            products_growth = float(
+                ((products_sold - prev_products) / prev_products) * 100
+            )
+
+        return {
+            "total_revenue": float(current_revenue),
+            "total_orders": current_total_orders,
+            "average_order_value": float(current_aov),
+            "products_sold": products_sold,
+            "revenue_growth": revenue_growth,
+            "order_growth": order_growth,
+            "aov_growth": aov_growth,
+            "products_growth": products_growth,
+            "period": period,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+        }
+
+    @staticmethod
+    def get_sales_trends(period: str = "daily", days: int = 30) -> List[Dict]:
+        """
+        Get sales trends over time
+
+        Args:
+            period: Trend period ('daily', 'weekly', 'monthly')
+            days: Number of days to look back
+
+        Returns:
+            List of trend data points
+        """
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+
+        trends_data = []
+
+        if period == "daily":
+            current_date = start_date
+            while current_date <= end_date:
+                daily_orders = Order.objects.filter(
+                    status="completed", created_at__date=current_date
+                )
+
+                daily_stats = daily_orders.aggregate(
+                    total_revenue=Sum("total"),
+                    total_orders=Count("id"),
+                )
+
+                # Handle None values from aggregation
+                total_revenue = daily_stats["total_revenue"] or Decimal("0")
+                total_orders = daily_stats["total_orders"] or 0
+
+                trends_data.append(
+                    {
+                        "date": current_date.isoformat(),
+                        "total_revenue": float(total_revenue),
+                        "total_orders": total_orders,
+                        "period_type": "daily",
+                    }
+                )
+
+                current_date += timedelta(days=1)
+
+        elif period == "weekly":
+            # Group by week
+            current_date = start_date
+            while current_date <= end_date:
+                week_start = current_date - timedelta(days=current_date.weekday())
+                week_end = week_start + timedelta(days=6)
+
+                weekly_orders = Order.objects.filter(
+                    status="completed",
+                    created_at__date__range=[week_start, min(week_end, end_date)],
+                )
+
+                weekly_stats = weekly_orders.aggregate(
+                    total_revenue=Sum("total"),
+                    total_orders=Count("id"),
+                )
+
+                # Handle None values from aggregation
+                total_revenue = weekly_stats["total_revenue"] or Decimal("0")
+                total_orders = weekly_stats["total_orders"] or 0
+
+                trends_data.append(
+                    {
+                        "date": week_start.isoformat(),
+                        "total_revenue": float(total_revenue),
+                        "total_orders": total_orders,
+                        "period_type": "weekly",
+                    }
+                )
+
+                current_date = week_end + timedelta(days=1)
+
+        return trends_data
+
+    @staticmethod
+    def get_daily_sales_report(
+        start_date: date = None, end_date: date = None
+    ) -> List[Dict]:
+        """
+        Get daily sales report
+
+        Args:
+            start_date: Start date (defaults to 30 days ago)
+            end_date: End date (defaults to today)
+
+        Returns:
+            List of daily sales data
+        """
+        if end_date is None:
+            end_date = timezone.now().date()
+        if start_date is None:
+            start_date = end_date - timedelta(days=30)
+
+        return SalesAnalyticsService.get_daily_sales(start_date, end_date)
+
+    @staticmethod
+    def get_weekly_sales_report(
+        start_date: date = None, end_date: date = None
+    ) -> List[Dict]:
+        """
+        Get weekly sales report
+
+        Args:
+            start_date: Start date (defaults to 12 weeks ago)
+            end_date: End date (defaults to today)
+
+        Returns:
+            List of weekly sales data
+        """
+        if end_date is None:
+            end_date = timezone.now().date()
+        if start_date is None:
+            start_date = end_date - timedelta(weeks=12)
+
+        weekly_data = []
+        current_date = start_date
+
+        while current_date <= end_date:
+            week_start = current_date - timedelta(days=current_date.weekday())
+            week_end = week_start + timedelta(days=6)
+
+            if week_end > end_date:
+                week_end = end_date
+
+            weekly_orders = Order.objects.filter(
+                status="completed", created_at__date__range=[week_start, week_end]
+            )
+
+            weekly_stats = weekly_orders.aggregate(
+                total_revenue=Sum("total"),
+                total_orders=Count("id"),
+                average_order_value=Avg("total"),
+            )
+
+            # Handle None values from aggregation
+            total_revenue = weekly_stats["total_revenue"] or Decimal("0")
+            total_orders = weekly_stats["total_orders"] or 0
+            average_order_value = weekly_stats["average_order_value"] or Decimal("0")
+
+            total_items = (
+                OrderItem.objects.filter(order__in=weekly_orders).aggregate(
+                    total_quantity=Sum("quantity")
+                )["total_quantity"]
+                or 0
+            )
+
+            weekly_data.append(
+                {
+                    "week_start": week_start,
+                    "week_end": week_end,
+                    "total_revenue": total_revenue,
+                    "total_orders": total_orders,
+                    "average_order_value": average_order_value,
+                    "total_items_sold": total_items,
+                }
+            )
+
+            current_date = week_end + timedelta(days=1)
+
+        return weekly_data
+
+    @staticmethod
+    def get_monthly_sales_report(
+        start_date: date = None, end_date: date = None
+    ) -> List[Dict]:
+        """
+        Get monthly sales report
+
+        Args:
+            start_date: Start date (defaults to 12 months ago)
+            end_date: End date (defaults to today)
+
+        Returns:
+            List of monthly sales data
+        """
+        if end_date is None:
+            end_date = timezone.now().date()
+        if start_date is None:
+            start_date = end_date - timedelta(days=365)
+
+        monthly_data = []
+        current_date = start_date.replace(day=1)  # Start at beginning of month
+
+        while current_date <= end_date:
+            # Get last day of current month
+            if current_date.month == 12:
+                month_end = current_date.replace(
+                    year=current_date.year + 1, month=1
+                ) - timedelta(days=1)
+            else:
+                month_end = current_date.replace(
+                    month=current_date.month + 1
+                ) - timedelta(days=1)
+
+            if month_end > end_date:
+                month_end = end_date
+
+            monthly_orders = Order.objects.filter(
+                status="completed", created_at__date__range=[current_date, month_end]
+            )
+
+            monthly_stats = monthly_orders.aggregate(
+                total_revenue=Sum("total"),
+                total_orders=Count("id"),
+                average_order_value=Avg("total"),
+            )
+
+            # Handle None values from aggregation
+            total_revenue = monthly_stats["total_revenue"] or Decimal("0")
+            total_orders = monthly_stats["total_orders"] or 0
+            average_order_value = monthly_stats["average_order_value"] or Decimal("0")
+
+            total_items = (
+                OrderItem.objects.filter(order__in=monthly_orders).aggregate(
+                    total_quantity=Sum("quantity")
+                )["total_quantity"]
+                or 0
+            )
+
+            monthly_data.append(
+                {
+                    "month": current_date.strftime("%Y-%m"),
+                    "month_start": current_date,
+                    "month_end": month_end,
+                    "total_revenue": total_revenue,
+                    "total_orders": total_orders,
+                    "average_order_value": average_order_value,
+                    "total_items_sold": total_items,
+                }
+            )
+
+            # Move to next month
+            if current_date.month == 12:
+                current_date = current_date.replace(year=current_date.year + 1, month=1)
+            else:
+                current_date = current_date.replace(month=current_date.month + 1)
+
+        return monthly_data

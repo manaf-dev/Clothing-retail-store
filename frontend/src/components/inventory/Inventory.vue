@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { inventoryService } from '@/services/inventoryService.js';
 import { useToast } from 'vue-toastification';
 
@@ -14,36 +14,18 @@ const showUpdateModal = ref(false);
 const selectedItem = ref(null);
 const updateQuantity = ref(0);
 
+// Pagination - same pattern as products and POS components
+const currentPage = ref(1);
+const totalPages = ref(1);
+const totalInventory = ref(0);
+const hasNext = ref(false);
+const hasPrevious = ref(false);
+
 // Computed properties
 const filteredInventory = computed(() => {
-  let filtered = inventory.value;
-  
-  if (searchQuery.value) {
-    filtered = filtered.filter(item => 
-      item.product_name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.value.toLowerCase())
-    );
-  }
-  
-  if (selectedCategory.value !== 'all') {
-    filtered = filtered.filter(item => item.category_name === selectedCategory.value);
-  }
-  
-  if (stockFilter.value !== 'all') {
-    switch (stockFilter.value) {
-      case 'low':
-        filtered = filtered.filter(item => item.stock_quantity <= 10);
-        break;
-      case 'out':
-        filtered = filtered.filter(item => item.stock_quantity === 0);
-        break;
-      case 'good':
-        filtered = filtered.filter(item => item.stock_quantity > 10);
-        break;
-    }
-  }
-  
-  return filtered;
+  // Since we're handling filtering on the backend through the API,
+  // we can just return all inventory items that were already filtered
+  return inventory.value;
 });
 
 const lowStockItems = computed(() => {
@@ -61,17 +43,77 @@ const categories = computed(() => {
   return uniqueCategories.filter(cat => cat);
 });
 
+// Pagination computed properties - same as products component
+const paginationStart = computed(() => {
+  if (totalInventory.value === 0) return 0;
+  return (currentPage.value - 1) * 10 + 1; // Backend uses 10 items per page by default
+});
+
+const paginationEnd = computed(() => {
+  const end = currentPage.value * 10;
+  return Math.min(end, totalInventory.value);
+});
+
 // Methods
-const loadInventory = async () => {
+const loadInventory = async (page = 1) => {
   try {
     loading.value = true;
-    const response = await inventoryService.getInventoryItems();
-    inventory.value = response.data.results || response.data;
+    const params = {
+      page,
+      search: searchQuery.value,
+      category: selectedCategory.value !== 'all' ? selectedCategory.value : '',
+      stock_status: stockFilter.value !== 'all' ? stockFilter.value : '',
+      ordering: '-created_at'
+    };
+
+    // Remove empty parameters
+    Object.keys(params).forEach(key => {
+      if (params[key] === '' || params[key] === null || params[key] === undefined) {
+        delete params[key];
+      }
+    });
+
+    const response = await inventoryService.getInventoryItems(params);
+    
+    // Handle paginated response - same as products component
+    if (response.data.results) {
+      inventory.value = response.data.results;
+      currentPage.value = response.data.current_page || page;
+      totalPages.value = response.data.num_pages || 1;
+      totalInventory.value = response.data.count || 0;
+      hasNext.value = response.data.has_next || false;
+      hasPrevious.value = response.data.has_previous || false;
+    } else {
+      // Handle non-paginated response (array)
+      inventory.value = response.data;
+      totalPages.value = 1;
+      totalInventory.value = response.data.length;
+      hasNext.value = false;
+      hasPrevious.value = false;
+    }
   } catch (error) {
     toast.error('Failed to load inventory');
     console.error('Error loading inventory:', error);
+    inventory.value = [];
   } finally {
     loading.value = false;
+  }
+};
+
+// Pagination functions - same as products component
+const goToPage = async (page) => {
+  await loadInventory(page);
+};
+
+const nextPage = async () => {
+  if (hasNext.value) {
+    await loadInventory(currentPage.value + 1);
+  }
+};
+
+const previousPage = async () => {
+  if (hasPrevious.value) {
+    await loadInventory(currentPage.value - 1);
   }
 };
 
@@ -126,6 +168,11 @@ const formatCurrency = (amount) => {
   }).format(amount || 0);
 };
 
+// Watch for search and filter changes - same as products component
+watch([searchQuery, selectedCategory, stockFilter], async () => {
+  await loadInventory(1);
+});
+
 // Lifecycle
 onMounted(() => {
   loadInventory();
@@ -141,7 +188,7 @@ onMounted(() => {
         <p class="text-gray-600">Track and manage product stock levels</p>
       </div>
       <button
-        @click="loadInventory"
+        @click="loadInventory(currentPage)"
         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
       >
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -164,7 +211,7 @@ onMounted(() => {
           </div>
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-600">Total Items</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ inventory.length }}</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ totalInventory }}</p>
           </div>
         </div>
       </div>
@@ -261,7 +308,7 @@ onMounted(() => {
         
         <div class="flex items-end">
           <button
-            @click="searchQuery = ''; selectedCategory = 'all'; stockFilter = 'all'"
+            @click="searchQuery = ''; selectedCategory = 'all'; stockFilter = 'all'; loadInventory(1)"
             class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md"
           >
             Clear Filters
@@ -274,7 +321,7 @@ onMounted(() => {
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
       <div class="p-6 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">
-          Inventory Items ({{ filteredInventory.length }})
+          Inventory Items ({{ totalInventory }})
         </h3>
       </div>
       
@@ -303,9 +350,9 @@ onMounted(() => {
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Category
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <!-- <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Size/Color
-              </th>
+              </th> -->
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Price
               </th>
@@ -324,14 +371,7 @@ onMounted(() => {
             <tr v-for="item in filteredInventory" :key="item.id" class="hover:bg-gray-50">
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
-                  <div class="flex-shrink-0 h-10 w-10">
-                    <img
-                      :src="item.image || '/api/placeholder/40/40'"
-                      :alt="item.product_name"
-                      class="h-10 w-10 rounded-full object-cover"
-                    />
-                  </div>
-                  <div class="ml-4">
+                  <div>
                     <div class="text-sm font-medium text-gray-900">{{ item.product_name }}</div>
                     <div class="text-sm text-gray-500">{{ item.sku }}</div>
                   </div>
@@ -340,9 +380,9 @@ onMounted(() => {
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {{ item.category_name }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <!-- <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {{ item.size }} - {{ item.color }}
-              </td>
+              </td> -->
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {{ formatCurrency(item.price) }}
               </td>
@@ -368,6 +408,92 @@ onMounted(() => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination - same as products component -->
+      <div v-if="inventory.length > 0" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+          <div>
+            <p class="text-sm text-gray-700">
+              Showing
+              <span class="font-medium">{{ paginationStart }}</span>
+              to
+              <span class="font-medium">{{ paginationEnd }}</span>
+              of
+              <span class="font-medium">{{ totalInventory }}</span>
+              results
+            </p>
+          </div>
+          <div>
+            <nav
+              class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+              aria-label="Pagination"
+            >
+              <button
+                @click="previousPage"
+                :disabled="!hasPrevious"
+                class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                :class="{
+                  'opacity-50 cursor-not-allowed': !hasPrevious,
+                }"
+              >
+                <span class="sr-only">Previous</span>
+                <svg
+                  class="h-5 w-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+
+              <button
+                v-for="page in totalPages"
+                :key="page"
+                @click="goToPage(page)"
+                :class="{
+                  'relative inline-flex items-center px-4 py-2 border text-sm font-medium': true,
+                  'bg-indigo-50 border-indigo-500 text-indigo-600':
+                    currentPage === page,
+                  'bg-white border-gray-300 text-gray-500 hover:bg-gray-50':
+                    currentPage !== page,
+                }"
+              >
+                {{ page }}
+              </button>
+
+              <button
+                @click="nextPage"
+                :disabled="!hasNext"
+                class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                :class="{
+                  'opacity-50 cursor-not-allowed': !hasNext,
+                }"
+              >
+                <span class="sr-only">Next</span>
+                <svg
+                  class="h-5 w-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+            </nav>
+          </div>
+        </div>
       </div>
     </div>
 

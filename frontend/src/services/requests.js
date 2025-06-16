@@ -21,12 +21,40 @@ export class BaseRequests {
     }
   }
 
+  static async postFormData(url, formData) {
+    try {
+      const response = await apiClient.post(url, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("API POST FormData Error:", error);
+      throw error;
+    }
+  }
+
   static async put(url, data = {}) {
     try {
       const response = await apiClient.put(url, data);
       return response.data;
     } catch (error) {
       console.error("API PUT Error:", error);
+      throw error;
+    }
+  }
+
+  static async putFormData(url, formData) {
+    try {
+      const response = await apiClient.put(url, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("API PUT FormData Error:", error);
       throw error;
     }
   }

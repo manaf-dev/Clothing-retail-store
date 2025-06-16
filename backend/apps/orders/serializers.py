@@ -249,3 +249,26 @@ class PaymentMethodReportSerializer(serializers.Serializer):
     total_sales = serializers.DecimalField(max_digits=12, decimal_places=2)
     order_count = serializers.IntegerField()
     percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
+
+
+class WeeklySalesReportSerializer(serializers.Serializer):
+    """Serializer for weekly sales reports"""
+
+    week_start = serializers.DateField()
+    week_end = serializers.DateField()
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_orders = serializers.IntegerField()
+    average_order_value = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_items_sold = serializers.IntegerField()
+
+
+class MonthlySalesReportSerializer(serializers.Serializer):
+    """Serializer for monthly sales reports"""
+
+    month = serializers.CharField()
+    month_start = serializers.DateField()
+    month_end = serializers.DateField()
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_orders = serializers.IntegerField()
+    average_order_value = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_items_sold = serializers.IntegerField()

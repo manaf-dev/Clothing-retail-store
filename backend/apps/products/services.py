@@ -5,7 +5,7 @@ from .serializers import ProductSerializer, CategorySerializer
 
 
 def create_product(
-    data: dict,
+    data: dict, request=None
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """
     Create a new product with the provided data.
@@ -16,7 +16,7 @@ def create_product(
     Returns:
         Tuple[Product data | None, error | None]: The created product data or error.
     """
-    serializer = ProductSerializer(data=data)
+    serializer = ProductSerializer(data=data, context={"request": request})
     if serializer.is_valid():
         product = serializer.save()
         return serializer.data, None
@@ -24,7 +24,7 @@ def create_product(
 
 
 def update_product(
-    product_id: str, data: dict
+    product_id: str, data: dict, request=None
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """
     Update an existing product with the provided data.
@@ -41,10 +41,15 @@ def update_product(
     except Product.DoesNotExist:
         return None, "Product not found"
 
-    serializer = ProductSerializer(product, data=data, partial=True)
+    serializer = ProductSerializer(
+        product, data=data, partial=True, context={"request": request}
+    )
     if serializer.is_valid():
         updated_product = serializer.save()
-        return ProductSerializer(updated_product).data, None
+        return (
+            ProductSerializer(updated_product, context={"request": request}).data,
+            None,
+        )
     return None, serializer.errors
 
 

@@ -28,6 +28,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "image",
             "category",
             "price",
             "sale_price",
@@ -65,6 +66,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            "image",
             "price",
             "sale_price",
             "stock",
@@ -104,13 +106,6 @@ class ProductSerializer(serializers.ModelSerializer):
         sale_price = attrs.get("sale_price")
         stock = attrs.get("stock")
         min_stock = attrs.get("min_stock")
-
-        # Validate sale price
-        if sale_price is not None and sale_price > 0:
-            if price and sale_price >= price:
-                raise serializers.ValidationError(
-                    {"sale_price": "Sale price must be less than the regular price."}
-                )
 
         # Validate stock
         if stock is not None and stock < 0:
@@ -155,6 +150,11 @@ class ProductSerializer(serializers.ModelSerializer):
             data["sale_price"] = f"{float(data['sale_price']):.2f}"
         if data.get("effective_price"):
             data["effective_price"] = f"{float(data['effective_price']):.2f}"
+        # build absolute URL for image with protocol and domain
+        if data.get("image"):
+            request = self.context.get("request")
+            if request:
+                data["image"] = request.build_absolute_uri(data["image"])
 
         return data
 

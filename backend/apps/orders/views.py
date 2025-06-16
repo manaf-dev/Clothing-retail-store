@@ -14,6 +14,8 @@ from .serializers import (
     OrderWriteSerializer,
     OrderItemReadSerializer,
     SalesReportSerializer,
+    WeeklySalesReportSerializer,
+    MonthlySalesReportSerializer,
     TopProductSerializer,
     PaymentMethodReportSerializer,
 )
@@ -177,7 +179,7 @@ class SalesAnalyticsViewSet(viewsets.ViewSet):
         analytics_service = SalesAnalyticsService()
         report_data = analytics_service.get_weekly_sales_report(start_date, end_date)
 
-        serializer = SalesReportSerializer(report_data, many=True)
+        serializer = WeeklySalesReportSerializer(report_data, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=["get"])
@@ -194,7 +196,7 @@ class SalesAnalyticsViewSet(viewsets.ViewSet):
         analytics_service = SalesAnalyticsService()
         report_data = analytics_service.get_monthly_sales_report(start_date, end_date)
 
-        serializer = SalesReportSerializer(report_data, many=True)
+        serializer = MonthlySalesReportSerializer(report_data, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=["get"])
@@ -212,10 +214,28 @@ class SalesAnalyticsViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"])
     def payment_methods(self, request):
         """Get payment method breakdown"""
-        period = request.query_params.get("period", "month")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        # If no dates provided, use default month period
+        if not start_date or not end_date:
+            from datetime import date, timedelta
+            from django.utils import timezone
+
+            today = timezone.now().date()
+            end_date = today
+            start_date = today.replace(day=1)  # First day of current month
+        else:
+            # Convert string dates to date objects
+            from datetime import datetime
+
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
         analytics_service = SalesAnalyticsService()
-        payment_data = analytics_service.get_payment_method_stats(period=period)
+        payment_data = analytics_service.get_payment_method_stats(
+            start_date=start_date, end_date=end_date
+        )
 
         serializer = PaymentMethodReportSerializer(payment_data, many=True)
         return Response(serializer.data)

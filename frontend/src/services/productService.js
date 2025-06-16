@@ -40,9 +40,15 @@ export class ProductService extends BaseRequests {
    * @param {number} productData.min_stock - Minimum stock level
    * @param {string} productData.category_id - Category UUID
    * @param {string} productData.status - Product status (active/inactive)
+   * @param {File} productData.imageFile - Image file (optional)
    * @returns {Promise<Object>} Created product data
    */
   static async createProduct(productData) {
+    // Check if we have an image file to upload
+    if (productData.imageFile) {
+      return await this.createProductWithImage(productData);
+    }
+
     // Transform frontend data to backend format
     const backendData = {
       name: productData.name,
@@ -59,12 +65,46 @@ export class ProductService extends BaseRequests {
   }
 
   /**
+   * Create a new product with image upload
+   * @param {Object} productData - Product data including image file
+   * @returns {Promise<Object>} Created product data
+   */
+  static async createProductWithImage(productData) {
+    const formData = new FormData();
+    
+    // Add all product fields to FormData
+    formData.append('name', productData.name);
+    formData.append('description', productData.description || '');
+    formData.append('price', parseFloat(productData.price));
+    if (productData.sale_price) {
+      formData.append('sale_price', parseFloat(productData.sale_price));
+    }
+    formData.append('stock', parseInt(productData.stock));
+    formData.append('min_stock', parseInt(productData.min_stock || productData.minStock || 0));
+    formData.append('category_id', productData.category_id || productData.category);
+    formData.append('status', productData.status || 'active');
+    
+    // Add image file
+    if (productData.imageFile) {
+      formData.append('image', productData.imageFile);
+    }
+
+    return await this.postFormData(`${this.BASE_URL}/`, formData);
+  }
+
+  /**
    * Update an existing product
    * @param {string} productId - Product UUID
    * @param {Object} productData - Updated product data
+   * @param {File} productData.imageFile - Image file (optional)
    * @returns {Promise<Object>} Updated product data
    */
   static async updateProduct(productId, productData) {
+    // Check if we have an image file to upload
+    if (productData.imageFile) {
+      return await this.updateProductWithImage(productId, productData);
+    }
+
     // Transform frontend data to backend format
     const backendData = {
       name: productData.name,
@@ -78,6 +118,35 @@ export class ProductService extends BaseRequests {
     };
 
     return await this.put(`${this.BASE_URL}/${productId}/`, backendData);
+  }
+
+  /**
+   * Update an existing product with image upload
+   * @param {string} productId - Product UUID
+   * @param {Object} productData - Updated product data including image file
+   * @returns {Promise<Object>} Updated product data
+   */
+  static async updateProductWithImage(productId, productData) {
+    const formData = new FormData();
+    
+    // Add all product fields to FormData
+    formData.append('name', productData.name);
+    formData.append('description', productData.description || '');
+    formData.append('price', parseFloat(productData.price));
+    if (productData.sale_price) {
+      formData.append('sale_price', parseFloat(productData.sale_price));
+    }
+    formData.append('stock', parseInt(productData.stock));
+    formData.append('min_stock', parseInt(productData.min_stock || productData.minStock || 0));
+    formData.append('category_id', productData.category_id || productData.category);
+    formData.append('status', productData.status || 'active');
+    
+    // Add image file
+    if (productData.imageFile) {
+      formData.append('image', productData.imageFile);
+    }
+
+    return await this.putFormData(`${this.BASE_URL}/${productId}/`, formData);
   }
 
   /**
@@ -182,6 +251,7 @@ export class ProductService extends BaseRequests {
       id: backendProduct.id,
       name: backendProduct.name,
       description: backendProduct.description,
+      image: backendProduct.image || null,
       price: parseFloat(backendProduct.price),
       sale_price: backendProduct.sale_price ? parseFloat(backendProduct.sale_price) : null,
       stock: backendProduct.stock,

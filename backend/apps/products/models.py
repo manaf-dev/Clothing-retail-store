@@ -32,6 +32,7 @@ class Product(models.Model):
     )
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    image = models.ImageField(upload_to="products/", null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     sale_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
@@ -50,6 +51,13 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def effective_price(self):
+        """Return the effective selling price (sale price if available, otherwise regular price)."""
+        if self.sale_price and self.sale_price > 0:
+            return self.sale_price
+        return self.price
 
     class Meta:
         ordering = ["name", "created_at"]

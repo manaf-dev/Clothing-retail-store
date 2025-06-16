@@ -2,6 +2,8 @@
     import { ref } from "vue";
     const isUserMenuOpen = ref(false);
 </script>
+
+
 <template>
     <header class="bg-white shadow">
         <div class="flex items-center justify-between px-6 py-4">
