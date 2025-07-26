@@ -13,7 +13,7 @@ const metrics = ref({
         avg_order_value: 0
     },
     today_metrics: {
-        total_revenue: 0,
+        total_sales: 0,
         orders_count: 0,
         items_sold: 0,
         avg_order_value: 0
@@ -158,12 +158,12 @@ onUnmounted(() => {
 
       <!-- Quick Stats Section -->
       <div class="quick-stats">
-        <div class="stats-card">
+        <div class="stats-card full-width">
           <h3>Today's Performance</h3>
           <div class="stats-grid">
             <div class="stat-item">
               <span class="stat-label">Today's Sales</span>
-              <span class="stat-value">₵{{ formatNumber(metrics.today_metrics?.total_revenue) }}</span>
+              <span class="stat-value">₵{{ formatNumber(metrics.today_metrics?.total_sales) }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">Orders Today</span>
@@ -177,26 +177,6 @@ onUnmounted(() => {
               <span class="stat-label">Items Sold</span>
               <span class="stat-value">{{ metrics.today_metrics?.items_sold }}</span>
             </div>
-          </div>
-        </div>
-
-        <div class="stats-card">
-          <h3>Inventory Alerts</h3>
-          <div v-if="metrics.inventory_alerts?.length > 0" class="alert-list">
-            <div v-for="item in metrics.inventory_alerts" :key="item.id" class="alert-item">
-              <div class="alert-icon">⚠️</div>
-              <div class="alert-content">
-                <span class="alert-product">{{ item.name }}</span>
-                <span class="alert-stock">{{ item.stock }} left</span>
-              </div>
-            </div>
-            <router-link to="/inventory" class="view-all-link">
-              View all alerts
-            </router-link>
-          </div>
-          <div v-else class="no-alerts">
-            <div class="no-alerts-icon">✅</div>
-            <p>All products are well stocked!</p>
           </div>
         </div>
       </div>
@@ -361,7 +341,7 @@ onUnmounted(() => {
 
 .quick-stats {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 20px;
   margin-bottom: 30px;
 }
@@ -371,6 +351,10 @@ onUnmounted(() => {
   border-radius: 8px;
   padding: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.stats-card.full-width {
+  width: 100%;
 }
 
 .stats-card h3 {

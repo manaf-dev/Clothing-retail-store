@@ -90,6 +90,7 @@ export const usePOSStore = defineStore('pos', {
           tax_amount: orderData.tax_amount || 0,
           discount_amount: orderData.discount_amount || 0,
           items: orderData.items,
+          status: 'completed',  // Mark POS orders as completed immediately
           payment_status: 'paid',
           served_by: 'POS System'
         });

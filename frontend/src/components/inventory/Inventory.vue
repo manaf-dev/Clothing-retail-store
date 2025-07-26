@@ -164,7 +164,7 @@ const getStockStatusText = (quantity) => {
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD'
+    currency: 'GHS'
   }).format(amount || 0);
 };
 

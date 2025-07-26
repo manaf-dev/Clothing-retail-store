@@ -137,6 +137,10 @@ class OrderWriteSerializer(serializers.ModelSerializer):
         print("Creating order serializer with data:", validated_data)
         items_data = validated_data.pop("items")
 
+        # If order is being created as completed, set completed_at timestamp
+        if validated_data.get("status") == "completed":
+            validated_data["completed_at"] = timezone.now()
+
         # Create order
         order = Order.objects.create(**validated_data)
 

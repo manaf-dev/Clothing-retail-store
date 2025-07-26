@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from datetime import date, datetime, timedelta
 from django.utils import timezone
@@ -126,7 +127,7 @@ class SalesAnalyticsViewSet(viewsets.ViewSet):
     """
     ViewSet for sales analytics and reporting using service layer
     """
-
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
 
     @action(detail=False, methods=["get"])

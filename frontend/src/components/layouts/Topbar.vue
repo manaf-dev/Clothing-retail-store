@@ -1,6 +1,33 @@
 <script setup>
-    import { ref } from "vue";
-    const isUserMenuOpen = ref(false);
+import { ref, computed } from "vue";
+import { useAuthStore } from "../../stores/auth";
+import { useRouter } from "vue-router";
+
+const isUserMenuOpen = ref(false);
+const auth = useAuthStore();
+const router = useRouter();
+
+const userName = computed(() => {
+  if (auth.user.value) {
+    const fullName = `${auth.user.value.first_name || ''} ${auth.user.value.last_name || ''}`.trim();
+    return fullName || auth.user.value.username;
+  }
+  return 'User';
+});
+
+const userRole = computed(() => {
+  return auth.user.value?.staff_profile?.role || 'Staff';
+});
+
+const handleLogout = async () => {
+  try {
+    await auth.logoutUser();
+    router.push('/login');
+  } catch (error) {
+    console.error('Logout error:', error);
+    router.push('/login');
+  }
+};
 </script>
 
 
@@ -47,9 +74,8 @@
                             alt="User avatar"
                         />
 
-                        <span class="ml-2 text-sm font-medium text-gray-700"
-                            >Admin User</span
-                        >
+                        <span class="ml-2 text-sm font-medium text-gray-700">{{ userName }}</span>
+                        <span class="ml-1 text-xs text-gray-500 capitalize">{{ userRole }}</span>
                         <svg
                             class="ml-1 h-5 w-5 text-gray-400"
                             fill="none"
@@ -72,19 +98,13 @@
                         <router-link
                             to="/profile"
                             class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            @click="isUserMenuOpen = false"
                         >
                             Your Profile
                         </router-link>
 
-                        <router-link
-                            to="/settings"
-                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                            Settings
-                        </router-link>
-
                         <button
-                            @click="logout"
+                            @click="handleLogout"
                             class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         >
                             Sign out

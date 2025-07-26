@@ -216,7 +216,7 @@ const generateSalesChart = async () => {
     for (let i = 0; i <= steps; i++) {
       const value = minValue + (range * i / steps);
       const y = padding + chartHeight - (i * chartHeight / steps);
-      const label = value >= 1000 ? '$' + (value / 1000).toFixed(1) + 'k' : '$' + Math.round(value);
+      const label = value >= 1000 ? '₵' + (value / 1000).toFixed(1) + 'k' : '₵' + Math.round(value);
       ctx.fillText(label, padding - 10, y);
     }
   } catch (err) {
@@ -382,7 +382,7 @@ onMounted(() => {
           </div>
           <div class="metric-content">
             <h3>Total Revenue</h3>
-            <p class="metric-value">${{ formatNumber(metrics.totalRevenue) }}</p>
+            <p class="metric-value">₵{{ formatNumber(metrics.totalRevenue) }}</p>
             <span class="metric-change" :class="{ positive: metrics.revenueChange >= 0, negative: metrics.revenueChange < 0 }">
               {{ metrics.revenueChange >= 0 ? '+' : '' }}{{ metrics.revenueChange.toFixed(1) }}%
             </span>
@@ -412,7 +412,7 @@ onMounted(() => {
           </div>
           <div class="metric-content">
             <h3>Average Order Value</h3>
-            <p class="metric-value">${{ formatNumber(metrics.averageOrderValue) }}</p>
+            <p class="metric-value">₵{{ formatNumber(metrics.averageOrderValue) }}</p>
             <span class="metric-change" :class="{ positive: metrics.aovChange >= 0, negative: metrics.aovChange < 0 }">
               {{ metrics.aovChange >= 0 ? '+' : '' }}{{ metrics.aovChange.toFixed(1) }}%
             </span>
@@ -469,7 +469,7 @@ onMounted(() => {
                   <span class="product-name">{{ product.name }}</span>
                   <span class="product-sales">{{ product.quantity_sold }} sold</span>
                 </div>
-                <span class="product-revenue">${{ formatNumber(product.revenue) }}</span>
+                <span class="product-revenue">₵{{ formatNumber(product.revenue) }}</span>
               </div>
             </div>
             <div v-else class="no-data">
@@ -500,7 +500,7 @@ onMounted(() => {
                 <td>#{{ order.order_number || order.id }}</td>
                 <td>{{ order.customer_name || order.customer?.name || 'Walk-in Customer' }}</td>
                 <td>{{ order.items?.length || order.item_count || 0 }}</td>
-                <td>${{ formatNumber(order.total) }}</td>
+                <td>₵{{ formatNumber(order.total) }}</td>
                 <td>
                   <span class="status-badge" :class="(order.status || 'pending').toLowerCase()">
                     {{ order.status || 'Pending' }}

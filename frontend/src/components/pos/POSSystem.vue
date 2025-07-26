@@ -52,9 +52,9 @@
   });
 
   const formattedTotal = computed(() => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-GH", {
       style: "currency",
-      currency: "USD",
+      currency: "GHS",
     }).format(finalTotal.value);
   });
   
@@ -296,7 +296,7 @@
             <p class="text-sm text-gray-500 mb-2">{{ product.category_name }}</p>
             <div class="flex justify-between items-center">
               <span class="text-lg font-bold text-gray-900">
-                ${{ product.effective_price }}
+                ₵{{ product.effective_price }}
               </span>
               <span
                 class="text-xs px-2 py-1 rounded"
@@ -505,9 +505,9 @@
               </div>
 
               <div class="text-right">
-                <p class="text-sm text-gray-500">${{ item.price }} each</p>
+                <p class="text-sm text-gray-500">₵{{ item.price }} each</p>
                 <p class="font-medium">
-                  ${{ (item.price * item.quantity).toFixed(2) }}
+                  ₵{{ (item.price * item.quantity).toFixed(2) }}
                 </p>
               </div>
             </div>
@@ -560,7 +560,7 @@
               v-model="discountType"
               class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
             >
-              <option value="amount">$</option>
+              <option value="amount">₵</option>
               <option value="percentage">%</option>
             </select>
           </div>
@@ -570,15 +570,15 @@
         <div class="space-y-2 pt-2 border-t border-gray-200">
           <div class="flex justify-between text-sm">
             <span>Subtotal:</span>
-            <span>${{ subtotal.toFixed(2) }}</span>
+            <span>₵{{ subtotal.toFixed(2) }}</span>
           </div>
           <div v-if="taxAmount > 0" class="flex justify-between text-sm">
             <span>Tax ({{ taxRate }}%):</span>
-            <span>${{ taxAmount.toFixed(2) }}</span>
+            <span>₵{{ taxAmount.toFixed(2) }}</span>
           </div>
           <div v-if="discountValue > 0" class="flex justify-between text-sm">
             <span>Discount:</span>
-            <span>-${{ discountValue.toFixed(2) }}</span>
+            <span>-₵{{ discountValue.toFixed(2) }}</span>
           </div>
           <div class="flex justify-between items-center text-lg font-bold pt-2 border-t border-gray-200">
             <span>Total:</span>

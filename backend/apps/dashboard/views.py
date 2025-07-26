@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum, Count, Avg, F
@@ -12,6 +13,7 @@ from apps.inventory.models import Inventory
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def dashboard_overview(request):
     """
     Comprehensive dashboard API for in-store management system
@@ -135,6 +137,7 @@ def dashboard_overview(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def sales_summary(request):
     """
     Quick sales summary for the current day
@@ -177,6 +180,7 @@ def sales_summary(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def inventory_alerts(request):
     """
     Get inventory alerts for low stock and out of stock items

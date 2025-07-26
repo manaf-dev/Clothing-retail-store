@@ -130,13 +130,13 @@
                             </p>
                             <p>
                                 <span class="font-medium">Total Spent:</span>
-                                ${{
+                                ₵{{
                                     selectedCustomer.totalSpent.toLocaleString()
                                 }}
                             </p>
                             <p>
                                 <span class="font-medium">Average Order:</span>
-                                ${{
+                                ₵{{
                                     (
                                         selectedCustomer.totalSpent /
                                         selectedCustomer.totalOrders
