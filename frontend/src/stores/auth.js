@@ -24,9 +24,13 @@ export const useAuthStore = () => {
     user.value = null;
   };
 
-  const loadUser = async () => {
-    if (accessToken.value && !user.value) {
+  const loadUser = async (forceRefresh = false) => {
+    if (accessToken.value && (!user.value || forceRefresh)) {
       try {
+        // Clear cached user data if forcing refresh
+        if (forceRefresh) {
+          localStorage.removeItem("user");
+        }
         const res = await getCurrentUser();
         user.value = res.data;
         localStorage.setItem("user", JSON.stringify(res.data));

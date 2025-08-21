@@ -40,6 +40,10 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/orders',
+      redirect: '/sales'
+    },
+    {
       path: '/reports',
       name: 'reports',
       component: ReportsView,
@@ -49,12 +53,6 @@ const router = createRouter({
       path: '/inventory',
       name: 'inventory',
       component: InventoryView,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/orders',
-      name: 'orders',
-      component: () => import('@/views/OrdersView.vue'),
       meta: { requiresAuth: true }
     },
     {

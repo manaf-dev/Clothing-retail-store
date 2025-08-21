@@ -19,6 +19,27 @@ const userRole = computed(() => {
   return auth.user.value?.staff_profile?.role || 'Staff';
 });
 
+const userProfileImage = computed(() => {
+  const profileImage = auth.user.value?.staff_profile?.profile_image;
+  if (profileImage) {
+    // If it's a relative path, prepend the API base URL
+    if (profileImage.startsWith('/')) {
+      return `http://localhost:8000${profileImage}`;
+    }
+    // If it's already a full URL, use as is
+    return profileImage;
+  }
+  return null;
+});
+
+const userInitials = computed(() => {
+  const user = auth.user.value;
+  if (user?.first_name && user?.last_name) {
+    return `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`.toUpperCase();
+  }
+  return user?.username?.charAt(0)?.toUpperCase() || 'U';
+});
+
 const handleLogout = async () => {
   try {
     await auth.logoutUser();
@@ -44,7 +65,7 @@ const handleLogout = async () => {
 
             <div class="flex items-center space-x-4">
                 <!-- Notifications -->
-                <button
+                <!-- <button
                     class="text-gray-500 hover:text-gray-700 focus:outline-none"
                 >
                     <svg
@@ -60,7 +81,7 @@ const handleLogout = async () => {
                             d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                         />
                     </svg>
-                </button>
+                </button> -->
 
                 <!-- User dropdown -->
                 <div class="relative" ref="userMenuContainer">
@@ -68,11 +89,21 @@ const handleLogout = async () => {
                         @click="isUserMenuOpen = !isUserMenuOpen"
                         class="flex items-center focus:outline-none"
                     >
-                        <img
-                            class="h-8 w-8 rounded-full object-cover"
-                            src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                            alt="User avatar"
-                        />
+                        <div class="relative">
+                            <img
+                                v-if="userProfileImage"
+                                :src="userProfileImage"
+                                class="h-8 w-8 rounded-full object-cover border"
+                                alt="User avatar"
+                                @error="$event.target.style.display = 'none'"
+                            />
+                            <div
+                                v-if="!userProfileImage"
+                                class="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-sm font-semibold"
+                            >
+                                {{ userInitials }}
+                            </div>
+                        </div>
 
                         <span class="ml-2 text-sm font-medium text-gray-700">{{ userName }}</span>
                         <span class="ml-1 text-xs text-gray-500 capitalize">{{ userRole }}</span>

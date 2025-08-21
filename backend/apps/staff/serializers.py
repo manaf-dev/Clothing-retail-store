@@ -15,6 +15,7 @@ class StaffProfileSerializer(serializers.ModelSerializer):
             "address",
             "salary",
             "is_active",
+            "profile_image",
         ]
 
 

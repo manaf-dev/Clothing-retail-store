@@ -26,7 +26,9 @@ def current_user(request):
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     """Update current user profile"""
-    serializer = ProfileUpdateSerializer(request.user, data=request.data, partial=True)
+    serializer = ProfileUpdateSerializer(
+        request.user, data=request.data, partial=True, context={"request": request}
+    )
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)

@@ -172,6 +172,28 @@ class OrderWriteSerializer(serializers.ModelSerializer):
             product.stock -= item_data["quantity"]
             product.save(update_fields=["stock"])
 
+            # Update or create inventory record to mirror product stock
+            try:
+                from apps.inventory.models import Inventory
+
+                inventory, _created = Inventory.objects.get_or_create(
+                    product=product,
+                    defaults={
+                        "stock": product.stock,
+                        "min_stock": getattr(product, "min_stock", 1) or 1,
+                    },
+                )
+                # If existing inventory, sync stock value
+                if not _created:
+                    inventory.stock = product.stock
+                    # ensure min_stock stays in sync if product has it
+                    if getattr(product, "min_stock", None) is not None:
+                        inventory.min_stock = product.min_stock
+                    inventory.save(update_fields=["stock", "min_stock"])
+            except Exception as e:
+                # Fail silently to avoid breaking order flow; could log
+                print("Inventory sync failed (create):", e)
+
             subtotal += order_item.line_total
 
         # Update order totals
@@ -197,7 +219,20 @@ class OrderWriteSerializer(serializers.ModelSerializer):
 
         # Update items if provided
         if items_data:
-            # This is a simplified update - in production you might want more sophisticated logic
+            # Restore stock from existing items BEFORE deleting them
+            for existing in instance.items.all():
+                if existing.product:
+                    existing.product.stock += existing.quantity
+                    existing.product.save(update_fields=["stock"])
+                    try:
+                        from apps.inventory.models import Inventory
+
+                        inv = existing.product.inventory
+                        inv.stock = existing.product.stock
+                        inv.save(update_fields=["stock"])
+                    except Exception:
+                        pass
+            # Remove old items
             instance.items.all().delete()
 
             subtotal = Decimal("0")
@@ -212,6 +247,29 @@ class OrderWriteSerializer(serializers.ModelSerializer):
                     price=item_data["price"],
                     discount=item_data.get("discount", 0),
                 )
+
+                # Decrease product stock for new items
+                product.stock -= item_data["quantity"]
+                product.save(update_fields=["stock"])
+
+                # Sync inventory
+                try:
+                    from apps.inventory.models import Inventory
+
+                    inventory, _created = Inventory.objects.get_or_create(
+                        product=product,
+                        defaults={
+                            "stock": product.stock,
+                            "min_stock": getattr(product, "min_stock", 1) or 1,
+                        },
+                    )
+                    if not _created:
+                        inventory.stock = product.stock
+                        if getattr(product, "min_stock", None) is not None:
+                            inventory.min_stock = product.min_stock
+                        inventory.save(update_fields=["stock", "min_stock"])
+                except Exception as e:
+                    print("Inventory sync failed (update):", e)
 
                 subtotal += order_item.line_total
 
