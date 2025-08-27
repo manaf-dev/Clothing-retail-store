@@ -652,6 +652,7 @@ onMounted(async () => {
 
     <!-- Delete Confirmation Modal -->
     <DeleteConfirmModal
+      v-if="showDeleteModal"
       :is-open="showDeleteModal"
       :product="productToDelete"
       @close="closeDeleteModal"

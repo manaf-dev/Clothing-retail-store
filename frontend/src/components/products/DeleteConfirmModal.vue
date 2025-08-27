@@ -7,6 +7,7 @@
         product: {
             type: Object,
             required: true,
+            default: () => {}
         },
     });
 

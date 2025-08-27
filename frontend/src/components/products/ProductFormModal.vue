@@ -105,11 +105,11 @@ const handleDrop = (event) => {
     }
 };
 
-const triggerFileInput = () => {
-    if (fileInputRef.value) {
-        fileInputRef.value.click();
-    }
-};
+// const triggerFileInput = () => {
+//     if (fileInputRef.value) {
+//         fileInputRef.value.click();
+//     }
+// };
 
 const removeImage = () => {
     selectedFile.value = null;
@@ -317,7 +317,6 @@ onMounted(async () => {
 
                                 <!-- Upload Area -->
                                 <div 
-                                    @click="triggerFileInput"
                                     @dragover="handleDragOver"
                                     @dragleave="handleDragLeave"
                                     @drop="handleDrop"
